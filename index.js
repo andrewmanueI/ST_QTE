@@ -1,7 +1,36 @@
 const MODULE_NAME = 'quick_time_event';
-const EXTENSION_FOLDER = 'third-party/quick-time-event';
 const TOOL_NAME = 'start_qte_timer';
 const DEFAULT_FALLBACK = "I couldn't think of anything to say.";
+const EXTENSION_SCRIPT_URL = document.currentScript?.src ?? '';
+const SETTINGS_TEMPLATE = `
+<div id="qte_settings" class="quick-time-event-settings">
+    <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+            <b>Quick Time Event</b>
+            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+        </div>
+        <div class="inline-drawer-content">
+            <label class="checkbox_label" for="qte_enabled">
+                <input id="qte_enabled" type="checkbox" />
+                <span>Enabled</span>
+            </label>
+
+            <label class="checkbox_label" for="qte_prompt_hint_enabled">
+                <input id="qte_prompt_hint_enabled" type="checkbox" />
+                <span>Prompt hint</span>
+            </label>
+
+            <label for="qte_default_seconds">Default seconds</label>
+            <input id="qte_default_seconds" type="number" min="1" max="30" step="1" />
+
+            <label for="qte_max_seconds">Max seconds</label>
+            <input id="qte_max_seconds" type="number" min="1" max="30" step="1" />
+
+            <label for="qte_fallback_text">Fallback text</label>
+            <textarea id="qte_fallback_text" rows="3"></textarea>
+        </div>
+    </div>
+</div>`;
 
 const defaultSettings = Object.freeze({
     enabled: true,
@@ -21,6 +50,17 @@ function getContext() {
 function getSettingsStore() {
     const context = getContext();
     return context.extensionSettings ?? window.extension_settings ?? {};
+}
+
+function getExtensionFolder() {
+    const scriptSources = Array.from(document.scripts).map((script) => script.src);
+    const scriptUrl = EXTENSION_SCRIPT_URL
+        || document.currentScript?.src
+        || scriptSources.find((src) => src.includes('/ST_QTE/') || src.includes('/quick-time-event/'))
+        || scriptSources.find((src) => /\/scripts\/extensions\/.+\/index\.js(?:\?.*)?$/.test(src));
+    const match = scriptUrl?.match(/\/scripts\/extensions\/(.+)\/index\.js(?:\?.*)?$/);
+
+    return match?.[1] ?? 'third-party/ST_QTE';
 }
 
 function getSettings() {
@@ -362,13 +402,14 @@ function updateCardSummary(card, { status, prompt, response, elapsedSeconds }) {
 async function renderSettings() {
     const context = getContext();
     const settings = getSettings();
-    let html = '';
+    let html = SETTINGS_TEMPLATE;
 
     if (typeof context.renderExtensionTemplateAsync === 'function') {
-        html = await context.renderExtensionTemplateAsync(EXTENSION_FOLDER, 'settings');
-    } else {
-        console.warn('Quick Time Event: renderExtensionTemplateAsync is not available.');
-        return;
+        try {
+            html = await context.renderExtensionTemplateAsync(getExtensionFolder(), 'settings');
+        } catch (error) {
+            console.warn('Quick Time Event: settings template failed to load; using inline fallback.', error);
+        }
     }
 
     const container = document.getElementById('extensions_settings2') ?? document.getElementById('extensions_settings');
@@ -388,6 +429,11 @@ function bindSettings(settings) {
     const defaultSeconds = document.getElementById('qte_default_seconds');
     const maxSeconds = document.getElementById('qte_max_seconds');
     const fallbackText = document.getElementById('qte_fallback_text');
+
+    if (!enabled || !promptHintEnabled || !defaultSeconds || !maxSeconds || !fallbackText) {
+        console.warn('Quick Time Event: settings controls were not found.');
+        return;
+    }
 
     enabled.checked = settings.enabled;
     promptHintEnabled.checked = settings.promptHintEnabled;
