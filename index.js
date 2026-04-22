@@ -1,5 +1,6 @@
-import { saveSettingsDebounced } from '../../../../script.js';
+import { saveChatConditional, saveSettingsDebounced } from '../../../../script.js';
 import { extension_settings, renderExtensionTemplateAsync } from '../../../extensions.js';
+import { sendSystemMessage, system_message_types } from '../../../system-messages.js';
 import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.js';
 import { SlashCommand } from '../../../slash-commands/SlashCommand.js';
 import { ARGUMENT_TYPE, SlashCommandArgument, SlashCommandNamedArgument } from '../../../slash-commands/SlashCommandArgument.js';
@@ -26,6 +27,11 @@ const SETTINGS_TEMPLATE = `
                 <span>Prompt hint</span>
             </label>
 
+            <label class="checkbox_label" for="qte_marker_mode_enabled">
+                <input id="qte_marker_mode_enabled" type="checkbox" />
+                <span>Marker detection</span>
+            </label>
+
             <div id="qte_tool_status" class="qte-tool-status"></div>
 
             <div class="qte-settings-grid">
@@ -45,6 +51,7 @@ const SETTINGS_TEMPLATE = `
 const defaultSettings = Object.freeze({
     enabled: true,
     promptHintEnabled: true,
+    markerModeEnabled: true,
     defaultSeconds: 10,
     maxSeconds: 30,
     fallbackText: DEFAULT_FALLBACK,
@@ -53,6 +60,8 @@ const defaultSettings = Object.freeze({
 let activeQte = null;
 let toolRegistered = false;
 let slashCommandRegistered = false;
+let markerListenerRegistered = false;
+const pendingMarkerQtes = new Map();
 
 function getContext() {
     const hostApi = globalThis.SillyTavern ?? window['Silly' + 'Tavern'];
@@ -88,6 +97,7 @@ function getSettings() {
 function normalizeSettings(settings) {
     settings.enabled = Boolean(settings.enabled);
     settings.promptHintEnabled = Boolean(settings.promptHintEnabled);
+    settings.markerModeEnabled = Boolean(settings.markerModeEnabled);
     settings.maxSeconds = clampInteger(settings.maxSeconds, 1, 30, defaultSettings.maxSeconds);
     settings.defaultSeconds = clampInteger(settings.defaultSeconds, 1, settings.maxSeconds, defaultSettings.defaultSeconds);
 
@@ -262,6 +272,136 @@ function registerSlashCommand() {
     }));
 
     slashCommandRegistered = true;
+}
+
+function registerMarkerListener() {
+    if (markerListenerRegistered) {
+        return;
+    }
+
+    const { eventSource, event_types } = getContext();
+
+    if (!eventSource || !event_types) {
+        console.warn('Quick Time Event: event API unavailable; marker detection disabled.');
+        return;
+    }
+
+    eventSource.on(event_types.MESSAGE_RECEIVED, handleMarkerMessageReceived);
+    eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, handleMarkerMessageRendered);
+    markerListenerRegistered = true;
+}
+
+function getMessageIdFromEvent(data) {
+    const rawId = typeof data === 'object' && data !== null
+        ? data.messageId ?? data.mesId ?? data.id ?? data.index
+        : data;
+    const messageId = Number.parseInt(rawId, 10);
+
+    return Number.isInteger(messageId) ? messageId : null;
+}
+
+function extractQteMarker(text) {
+    if (typeof text !== 'string' || !text.includes('<qte')) {
+        return null;
+    }
+
+    const markerRegex = /<qte\b([^>]*)>([\s\S]*?)<\/qte>/i;
+    const match = text.match(markerRegex);
+
+    if (!match) {
+        return null;
+    }
+
+    const attributes = parseQteAttributes(match[1]);
+    const prompt = match[2].trim();
+
+    if (!prompt) {
+        return null;
+    }
+
+    return {
+        args: {
+            prompt,
+            seconds: attributes.seconds,
+            fallbackText: attributes.fallback ?? attributes.fallbackText,
+            intensity: attributes.intensity,
+        },
+        cleanedText: text.replace(markerRegex, '').trim(),
+    };
+}
+
+function parseQteAttributes(rawAttributes) {
+    const attributes = {};
+    const attributeRegex = /([a-zA-Z][\w-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/g;
+    let match;
+
+    while ((match = attributeRegex.exec(rawAttributes ?? '')) !== null) {
+        attributes[match[1]] = match[2] ?? match[3] ?? match[4] ?? '';
+    }
+
+    return attributes;
+}
+
+async function handleMarkerMessageReceived(data) {
+    const settings = getSettings();
+
+    if (!settings.enabled || !settings.markerModeEnabled) {
+        return;
+    }
+
+    const messageId = getMessageIdFromEvent(data);
+    const { chat } = getContext();
+    const message = Number.isInteger(messageId) ? chat?.[messageId] : null;
+
+    if (!message || message.is_user) {
+        return;
+    }
+
+    const marker = extractQteMarker(message.mes);
+
+    if (!marker) {
+        return;
+    }
+
+    message.mes = marker.cleanedText;
+
+    if (Array.isArray(message.swipes) && Number.isInteger(message.swipe_id)) {
+        message.swipes[message.swipe_id] = marker.cleanedText;
+    }
+
+    pendingMarkerQtes.set(messageId, marker.args);
+    saveChatConditional().catch((error) => console.warn('Quick Time Event: failed to save stripped marker.', error));
+
+    window.setTimeout(() => {
+        if (pendingMarkerQtes.has(messageId)) {
+            runPendingMarkerQte(messageId);
+        }
+    }, 500);
+}
+
+function handleMarkerMessageRendered(data) {
+    const messageId = getMessageIdFromEvent(data);
+
+    if (Number.isInteger(messageId)) {
+        runPendingMarkerQte(messageId);
+    }
+}
+
+async function runPendingMarkerQte(messageId) {
+    const args = pendingMarkerQtes.get(messageId);
+
+    if (!args) {
+        return;
+    }
+
+    pendingMarkerQtes.delete(messageId);
+
+    const result = await startQteTool(args, { requireFunctionTools: false });
+    sendSystemMessage(system_message_types.GENERIC, result, {
+        isSmallSys: true,
+        qte_result: true,
+    });
+    await saveChatConditional();
 }
 
 async function startQteTool(args = {}, options = {}) {
@@ -506,17 +646,19 @@ function updateToolStatus() {
 function bindSettings(settings) {
     const enabled = document.getElementById('qte_enabled');
     const promptHintEnabled = document.getElementById('qte_prompt_hint_enabled');
+    const markerModeEnabled = document.getElementById('qte_marker_mode_enabled');
     const defaultSeconds = document.getElementById('qte_default_seconds');
     const maxSeconds = document.getElementById('qte_max_seconds');
     const fallbackText = document.getElementById('qte_fallback_text');
 
-    if (!enabled || !promptHintEnabled || !defaultSeconds || !maxSeconds || !fallbackText) {
+    if (!enabled || !promptHintEnabled || !markerModeEnabled || !defaultSeconds || !maxSeconds || !fallbackText) {
         console.warn('Quick Time Event: settings controls were not found.');
         return;
     }
 
     enabled.checked = settings.enabled;
     promptHintEnabled.checked = settings.promptHintEnabled;
+    markerModeEnabled.checked = settings.markerModeEnabled;
     defaultSeconds.value = settings.defaultSeconds;
     maxSeconds.value = settings.maxSeconds;
     fallbackText.value = settings.fallbackText;
@@ -532,6 +674,11 @@ function bindSettings(settings) {
         settings.promptHintEnabled = promptHintEnabled.checked;
         registerFunctionTool();
         updateToolStatus();
+        saveSettings();
+    });
+
+    markerModeEnabled.addEventListener('change', () => {
+        settings.markerModeEnabled = markerModeEnabled.checked;
         saveSettings();
     });
 
@@ -560,4 +707,5 @@ jQuery(async () => {
     await renderSettings();
     registerFunctionTool();
     registerSlashCommand();
+    registerMarkerListener();
 });

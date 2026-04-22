@@ -8,8 +8,19 @@ Quick Time Event is a lightweight QTE extension that presents a timed prompt, wa
 - Typed answer submission.
 - Skip/freeze action for immediate fallback.
 - Timeout fallback when the timer expires.
+- Marker detection for model-initiated events.
 - Configurable default duration, maximum duration, prompt hint, and fallback text.
 - Compact completed-card summary after each event.
+
+## Marker mode
+
+Use this marker when a timed response should be triggered from generated text:
+
+```text
+<qte seconds="5" intensity="high">The door bursts open. What do you say?</qte>
+```
+
+The extension removes the marker, opens the QTE card, and records a compact QTE result message after the timer resolves.
 
 ## Tool
 
