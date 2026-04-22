@@ -2,6 +2,29 @@
     resize: vertical;
 }
 
+.quick-time-event-settings .inline-drawer-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.qte-settings-grid {
+    align-items: center;
+    display: grid;
+    gap: 8px 10px;
+    grid-template-columns: minmax(120px, max-content) minmax(80px, 180px);
+}
+
+.qte-settings-grid label {
+    margin: 0;
+}
+
+.qte-settings-grid textarea {
+    box-sizing: border-box;
+    grid-column: 1 / -1;
+    width: 100%;
+}
+
 .qte-card-wrapper {
     box-sizing: border-box;
     display: flex;
@@ -131,6 +154,10 @@
 }
 
 @media (max-width: 520px) {
+    .qte-settings-grid {
+        grid-template-columns: 1fr;
+    }
+
     .qte-card {
         padding: 12px;
     }
