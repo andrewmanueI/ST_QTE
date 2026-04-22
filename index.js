@@ -257,16 +257,17 @@ function registerSlashCommand() {
                 seconds: args?.seconds,
                 fallbackText: args?.fallback,
                 intensity: args?.intensity,
-            });
+            }, { requireFunctionTools: false });
         },
     }));
 
     slashCommandRegistered = true;
 }
 
-async function startQteTool(args = {}) {
+async function startQteTool(args = {}, options = {}) {
     const settings = getSettings();
     const startedAt = performance.now();
+    const requireFunctionTools = options.requireFunctionTools ?? true;
 
     if (!settings.enabled) {
         return formatQteResult({
@@ -276,7 +277,7 @@ async function startQteTool(args = {}) {
         });
     }
 
-    if (!canUseFunctionTools()) {
+    if (requireFunctionTools && !canUseFunctionTools()) {
         return formatQteResult({
             status: 'error',
             prompt: args?.prompt,
