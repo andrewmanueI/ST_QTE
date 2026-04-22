@@ -8,6 +8,8 @@ import { ARGUMENT_TYPE, SlashCommandArgument, SlashCommandNamedArgument } from '
 const MODULE_NAME = 'quick_time_event';
 const TOOL_NAME = 'start_qte_timer';
 const DEFAULT_FALLBACK = "I couldn't think of anything to say.";
+const MIN_SECONDS = 10;
+const MAX_SECONDS = 30;
 const EXTENSION_SCRIPT_URL = document.currentScript?.src ?? '';
 const SETTINGS_TEMPLATE = `
 <div id="qte_settings" class="quick-time-event-settings">
@@ -41,10 +43,10 @@ const SETTINGS_TEMPLATE = `
 
             <div class="qte-settings-grid">
                 <label for="qte_default_seconds">Default seconds</label>
-                <input id="qte_default_seconds" type="number" min="1" max="30" step="1" />
+                <input id="qte_default_seconds" type="number" min="10" max="30" step="1" />
 
                 <label for="qte_max_seconds">Max seconds</label>
-                <input id="qte_max_seconds" type="number" min="1" max="30" step="1" />
+                <input id="qte_max_seconds" type="number" min="10" max="30" step="1" />
 
                 <label for="qte_fallback_text">Fallback text</label>
                 <textarea id="qte_fallback_text" rows="3"></textarea>
@@ -105,8 +107,8 @@ function normalizeSettings(settings) {
     settings.promptHintEnabled = Boolean(settings.promptHintEnabled);
     settings.markerModeEnabled = Boolean(settings.markerModeEnabled);
     settings.autoContinueEnabled = Boolean(settings.autoContinueEnabled);
-    settings.maxSeconds = clampInteger(settings.maxSeconds, 1, 30, defaultSettings.maxSeconds);
-    settings.defaultSeconds = clampInteger(settings.defaultSeconds, 1, settings.maxSeconds, defaultSettings.defaultSeconds);
+    settings.maxSeconds = clampInteger(settings.maxSeconds, MIN_SECONDS, MAX_SECONDS, defaultSettings.maxSeconds);
+    settings.defaultSeconds = clampInteger(settings.defaultSeconds, MIN_SECONDS, settings.maxSeconds, defaultSettings.defaultSeconds);
 
     if (typeof settings.fallbackText !== 'string' || !settings.fallbackText.trim()) {
         settings.fallbackText = DEFAULT_FALLBACK;
@@ -199,7 +201,7 @@ function registerFunctionTool() {
                 },
                 seconds: {
                     type: 'integer',
-                    minimum: 1,
+                    minimum: MIN_SECONDS,
                     maximum: settings.maxSeconds,
                     default: settings.defaultSeconds,
                     description: 'How many seconds the user has to answer. Capped by the extension settings.',
@@ -473,9 +475,9 @@ async function startQteTool(args = {}, options = {}) {
         });
     }
 
-    const maxSeconds = clampInteger(settings.maxSeconds, 1, 30, defaultSettings.maxSeconds);
-    const defaultSeconds = clampInteger(settings.defaultSeconds, 1, maxSeconds, defaultSettings.defaultSeconds);
-    const seconds = clampInteger(args.seconds, 1, maxSeconds, defaultSeconds);
+    const maxSeconds = clampInteger(settings.maxSeconds, MIN_SECONDS, MAX_SECONDS, defaultSettings.maxSeconds);
+    const defaultSeconds = clampInteger(settings.defaultSeconds, MIN_SECONDS, maxSeconds, defaultSettings.defaultSeconds);
+    const seconds = clampInteger(args.seconds, MIN_SECONDS, maxSeconds, defaultSeconds);
     const fallbackText = typeof args.fallbackText === 'string' && args.fallbackText.trim()
         ? args.fallbackText.trim()
         : settings.fallbackText;
@@ -718,14 +720,14 @@ function bindSettings(settings) {
     });
 
     defaultSeconds.addEventListener('input', () => {
-        settings.defaultSeconds = clampInteger(defaultSeconds.value, 1, settings.maxSeconds, defaultSettings.defaultSeconds);
+        settings.defaultSeconds = clampInteger(defaultSeconds.value, MIN_SECONDS, settings.maxSeconds, defaultSettings.defaultSeconds);
         defaultSeconds.value = settings.defaultSeconds;
         saveSettings();
     });
 
     maxSeconds.addEventListener('input', () => {
-        settings.maxSeconds = clampInteger(maxSeconds.value, 1, 30, defaultSettings.maxSeconds);
-        settings.defaultSeconds = clampInteger(settings.defaultSeconds, 1, settings.maxSeconds, defaultSettings.defaultSeconds);
+        settings.maxSeconds = clampInteger(maxSeconds.value, MIN_SECONDS, MAX_SECONDS, defaultSettings.maxSeconds);
+        settings.defaultSeconds = clampInteger(settings.defaultSeconds, MIN_SECONDS, settings.maxSeconds, defaultSettings.defaultSeconds);
         maxSeconds.value = settings.maxSeconds;
         defaultSeconds.value = settings.defaultSeconds;
         saveSettings();
