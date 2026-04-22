@@ -1,4 +1,4 @@
-import { Generate, isGenerating, saveChatConditional, saveSettingsDebounced } from '../../../../script.js';
+import { Generate, isGenerating, saveChatConditional, saveSettingsDebounced, sendMessageAsUser } from '../../../../script.js';
 import { extension_settings, renderExtensionTemplateAsync } from '../../../extensions.js';
 import { sendSystemMessage, system_message_types } from '../../../system-messages.js';
 import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.js';
@@ -34,7 +34,7 @@ const SETTINGS_TEMPLATE = `
 
             <label class="checkbox_label" for="qte_auto_continue_enabled">
                 <input id="qte_auto_continue_enabled" type="checkbox" />
-                <span>Auto-continue after QTE</span>
+                <span>Send QTE result as user and auto-continue</span>
             </label>
 
             <div id="qte_tool_status" class="qte-tool-status"></div>
@@ -405,13 +405,29 @@ async function runPendingMarkerQte(messageId) {
     pendingMarkerQtes.delete(messageId);
 
     const result = await startQteTool(args, { requireFunctionTools: false });
-    sendSystemMessage(system_message_types.GENERIC, result, {
-        isSmallSys: true,
-        qte_result: true,
-    });
-    await saveChatConditional();
 
     if (settings.autoContinueEnabled && !isGenerating()) {
+        const userMessage = extractResponseFromQteResult(result);
+        await sendMessageAsUser(userMessage, null, null, false);
+        await continueAfterUserQteMessage();
+    } else {
+        sendSystemMessage(system_message_types.GENERIC, result, {
+            isSmallSys: true,
+            qte_result: true,
+        });
+        await saveChatConditional();
+    }
+}
+
+function extractResponseFromQteResult(result) {
+    const match = String(result ?? '').match(/^response:\s*(.*)$/m);
+    const response = match?.[1]?.trim();
+
+    return response || DEFAULT_FALLBACK;
+}
+
+async function continueAfterUserQteMessage() {
+    if (!isGenerating()) {
         await Generate('normal', { automatic_trigger: true });
     }
 }
