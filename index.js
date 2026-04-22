@@ -1,3 +1,6 @@
+import { saveSettingsDebounced } from '../../../../script.js';
+import { extension_settings, renderExtensionTemplateAsync } from '../../../extensions.js';
+
 const MODULE_NAME = 'quick_time_event';
 const TOOL_NAME = 'start_qte_timer';
 const DEFAULT_FALLBACK = "I couldn't think of anything to say.";
@@ -52,11 +55,6 @@ function getContext() {
     return hostApi?.getContext?.() ?? {};
 }
 
-function getSettingsStore() {
-    const context = getContext();
-    return context.extensionSettings ?? window.extension_settings ?? {};
-}
-
 function getExtensionFolder() {
     const scriptSources = Array.from(document.scripts).map((script) => script.src);
     const scriptUrl = EXTENSION_SCRIPT_URL
@@ -69,20 +67,18 @@ function getExtensionFolder() {
 }
 
 function getSettings() {
-    const store = getSettingsStore();
-
-    if (!store[MODULE_NAME]) {
-        store[MODULE_NAME] = structuredClone(defaultSettings);
+    if (!extension_settings[MODULE_NAME]) {
+        extension_settings[MODULE_NAME] = structuredClone(defaultSettings);
     }
 
     for (const key of Object.keys(defaultSettings)) {
-        if (!Object.hasOwn(store[MODULE_NAME], key)) {
-            store[MODULE_NAME][key] = defaultSettings[key];
+        if (!Object.hasOwn(extension_settings[MODULE_NAME], key)) {
+            extension_settings[MODULE_NAME][key] = defaultSettings[key];
         }
     }
 
-    normalizeSettings(store[MODULE_NAME]);
-    return store[MODULE_NAME];
+    normalizeSettings(extension_settings[MODULE_NAME]);
+    return extension_settings[MODULE_NAME];
 }
 
 function normalizeSettings(settings) {
@@ -97,8 +93,7 @@ function normalizeSettings(settings) {
 }
 
 function saveSettings() {
-    const context = getContext();
-    context.saveSettingsDebounced?.();
+    saveSettingsDebounced();
 }
 
 function clampInteger(value, min, max, fallback) {
@@ -415,12 +410,10 @@ async function renderSettings() {
     const settings = getSettings();
     let html = SETTINGS_TEMPLATE;
 
-    if (typeof context.renderExtensionTemplateAsync === 'function') {
-        try {
-            html = await context.renderExtensionTemplateAsync(getExtensionFolder(), 'settings');
-        } catch (error) {
-            console.warn('Quick Time Event: settings template failed to load; using inline fallback.', error);
-        }
+    try {
+        html = await renderExtensionTemplateAsync(getExtensionFolder(), 'settings');
+    } catch (error) {
+        console.warn('Quick Time Event: settings template failed to load; using inline fallback.', error);
     }
 
     const container = document.getElementById('extensions_settings2') ?? document.getElementById('extensions_settings');
