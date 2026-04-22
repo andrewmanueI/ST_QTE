@@ -1,5 +1,8 @@
 import { saveSettingsDebounced } from '../../../../script.js';
 import { extension_settings, renderExtensionTemplateAsync } from '../../../extensions.js';
+import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.js';
+import { SlashCommand } from '../../../slash-commands/SlashCommand.js';
+import { ARGUMENT_TYPE, SlashCommandArgument, SlashCommandNamedArgument } from '../../../slash-commands/SlashCommandArgument.js';
 
 const MODULE_NAME = 'quick_time_event';
 const TOOL_NAME = 'start_qte_timer';
@@ -49,6 +52,7 @@ const defaultSettings = Object.freeze({
 
 let activeQte = null;
 let toolRegistered = false;
+let slashCommandRegistered = false;
 
 function getContext() {
     const hostApi = globalThis.SillyTavern ?? window['Silly' + 'Tavern'];
@@ -205,6 +209,59 @@ function registerFunctionTool() {
 
     toolRegistered = true;
     updateToolStatus();
+}
+
+function registerSlashCommand() {
+    if (slashCommandRegistered) {
+        return;
+    }
+
+    SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+        name: 'qte',
+        aliases: ['quick-time-event'],
+        helpString: 'Starts a Quick Time Event timer. Example: /qte seconds=5 The door bursts open. What do you say?',
+        namedArgumentList: [
+            SlashCommandNamedArgument.fromProps({
+                name: 'seconds',
+                description: 'Timer duration in seconds',
+                typeList: [ARGUMENT_TYPE.NUMBER],
+                isRequired: false,
+                acceptsMultiple: false,
+            }),
+            SlashCommandNamedArgument.fromProps({
+                name: 'fallback',
+                description: 'Fallback text for skip or timeout',
+                typeList: [ARGUMENT_TYPE.STRING],
+                isRequired: false,
+                acceptsMultiple: false,
+            }),
+            SlashCommandNamedArgument.fromProps({
+                name: 'intensity',
+                description: 'Visual intensity: low, medium, high, or critical',
+                typeList: [ARGUMENT_TYPE.STRING],
+                isRequired: false,
+                acceptsMultiple: false,
+            }),
+        ],
+        unnamedArgumentList: [
+            SlashCommandArgument.fromProps({
+                description: 'QTE prompt text',
+                typeList: [ARGUMENT_TYPE.STRING],
+                isRequired: true,
+                acceptsMultiple: false,
+            }),
+        ],
+        callback: async (args, prompt) => {
+            return await startQteTool({
+                prompt: String(prompt ?? ''),
+                seconds: args?.seconds,
+                fallbackText: args?.fallback,
+                intensity: args?.intensity,
+            });
+        },
+    }));
+
+    slashCommandRegistered = true;
 }
 
 async function startQteTool(args = {}) {
@@ -501,4 +558,5 @@ jQuery(async () => {
     getSettings();
     await renderSettings();
     registerFunctionTool();
+    registerSlashCommand();
 });
