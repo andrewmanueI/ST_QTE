@@ -1,4 +1,4 @@
-import { saveChatConditional, saveSettingsDebounced } from '../../../../script.js';
+import { Generate, isGenerating, saveChatConditional, saveSettingsDebounced } from '../../../../script.js';
 import { extension_settings, renderExtensionTemplateAsync } from '../../../extensions.js';
 import { sendSystemMessage, system_message_types } from '../../../system-messages.js';
 import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.js';
@@ -32,6 +32,11 @@ const SETTINGS_TEMPLATE = `
                 <span>Marker detection</span>
             </label>
 
+            <label class="checkbox_label" for="qte_auto_continue_enabled">
+                <input id="qte_auto_continue_enabled" type="checkbox" />
+                <span>Auto-continue after QTE</span>
+            </label>
+
             <div id="qte_tool_status" class="qte-tool-status"></div>
 
             <div class="qte-settings-grid">
@@ -52,6 +57,7 @@ const defaultSettings = Object.freeze({
     enabled: true,
     promptHintEnabled: true,
     markerModeEnabled: true,
+    autoContinueEnabled: true,
     defaultSeconds: 10,
     maxSeconds: 30,
     fallbackText: DEFAULT_FALLBACK,
@@ -98,6 +104,7 @@ function normalizeSettings(settings) {
     settings.enabled = Boolean(settings.enabled);
     settings.promptHintEnabled = Boolean(settings.promptHintEnabled);
     settings.markerModeEnabled = Boolean(settings.markerModeEnabled);
+    settings.autoContinueEnabled = Boolean(settings.autoContinueEnabled);
     settings.maxSeconds = clampInteger(settings.maxSeconds, 1, 30, defaultSettings.maxSeconds);
     settings.defaultSeconds = clampInteger(settings.defaultSeconds, 1, settings.maxSeconds, defaultSettings.defaultSeconds);
 
@@ -388,6 +395,7 @@ function handleMarkerMessageRendered(data) {
 }
 
 async function runPendingMarkerQte(messageId) {
+    const settings = getSettings();
     const args = pendingMarkerQtes.get(messageId);
 
     if (!args) {
@@ -402,6 +410,10 @@ async function runPendingMarkerQte(messageId) {
         qte_result: true,
     });
     await saveChatConditional();
+
+    if (settings.autoContinueEnabled && !isGenerating()) {
+        await Generate('normal', { automatic_trigger: true });
+    }
 }
 
 async function startQteTool(args = {}, options = {}) {
@@ -647,11 +659,12 @@ function bindSettings(settings) {
     const enabled = document.getElementById('qte_enabled');
     const promptHintEnabled = document.getElementById('qte_prompt_hint_enabled');
     const markerModeEnabled = document.getElementById('qte_marker_mode_enabled');
+    const autoContinueEnabled = document.getElementById('qte_auto_continue_enabled');
     const defaultSeconds = document.getElementById('qte_default_seconds');
     const maxSeconds = document.getElementById('qte_max_seconds');
     const fallbackText = document.getElementById('qte_fallback_text');
 
-    if (!enabled || !promptHintEnabled || !markerModeEnabled || !defaultSeconds || !maxSeconds || !fallbackText) {
+    if (!enabled || !promptHintEnabled || !markerModeEnabled || !autoContinueEnabled || !defaultSeconds || !maxSeconds || !fallbackText) {
         console.warn('Quick Time Event: settings controls were not found.');
         return;
     }
@@ -659,6 +672,7 @@ function bindSettings(settings) {
     enabled.checked = settings.enabled;
     promptHintEnabled.checked = settings.promptHintEnabled;
     markerModeEnabled.checked = settings.markerModeEnabled;
+    autoContinueEnabled.checked = settings.autoContinueEnabled;
     defaultSeconds.value = settings.defaultSeconds;
     maxSeconds.value = settings.maxSeconds;
     fallbackText.value = settings.fallbackText;
@@ -679,6 +693,11 @@ function bindSettings(settings) {
 
     markerModeEnabled.addEventListener('change', () => {
         settings.markerModeEnabled = markerModeEnabled.checked;
+        saveSettings();
+    });
+
+    autoContinueEnabled.addEventListener('change', () => {
+        settings.autoContinueEnabled = autoContinueEnabled.checked;
         saveSettings();
     });
 
