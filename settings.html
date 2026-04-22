@@ -1,0 +1,28 @@
+<div id="qte_settings" class="quick-time-event-settings">
+    <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+            <b>Quick Time Event</b>
+            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+        </div>
+        <div class="inline-drawer-content">
+            <label class="checkbox_label" for="qte_enabled">
+                <input id="qte_enabled" type="checkbox" />
+                <span>Enabled</span>
+            </label>
+
+            <label class="checkbox_label" for="qte_prompt_hint_enabled">
+                <input id="qte_prompt_hint_enabled" type="checkbox" />
+                <span>Prompt hint</span>
+            </label>
+
+            <label for="qte_default_seconds">Default seconds</label>
+            <input id="qte_default_seconds" type="number" min="1" max="30" step="1" />
+
+            <label for="qte_max_seconds">Max seconds</label>
+            <input id="qte_max_seconds" type="number" min="1" max="30" step="1" />
+
+            <label for="qte_fallback_text">Fallback text</label>
+            <textarea id="qte_fallback_text" rows="3"></textarea>
+        </div>
+    </div>
+</div>

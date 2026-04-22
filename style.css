@@ -1,0 +1,147 @@
+.quick-time-event-settings textarea {
+    resize: vertical;
+}
+
+.qte-card-wrapper {
+    box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+    margin: 12px 0;
+    padding: 0 12px;
+    width: 100%;
+}
+
+.qte-card {
+    background: var(--SmartThemeBlurTintColor, rgba(24, 24, 28, 0.92));
+    border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.16));
+    border-left: 5px solid #c9b458;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+    box-sizing: border-box;
+    color: var(--SmartThemeBodyColor, inherit);
+    max-width: 720px;
+    padding: 14px;
+    width: min(100%, 720px);
+}
+
+.qte-card-header,
+.qte-card-controls {
+    align-items: center;
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+}
+
+.qte-card-title {
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.qte-card-timer,
+.qte-status-badge,
+.qte-card-meta {
+    color: var(--SmartThemeEmColor, inherit);
+    font-size: 0.88rem;
+    white-space: nowrap;
+}
+
+.qte-card-prompt {
+    line-height: 1.45;
+    margin: 12px 0;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.qte-progress-track {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+    height: 8px;
+    margin-bottom: 12px;
+    overflow: hidden;
+}
+
+.qte-progress-fill {
+    background: #c9b458;
+    height: 100%;
+    transition: width 120ms linear;
+    width: 100%;
+}
+
+.qte-card-input {
+    box-sizing: border-box;
+    margin-bottom: 12px;
+    min-height: 58px;
+    resize: vertical;
+    width: 100%;
+}
+
+.qte-card-response {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    margin: 10px 0;
+    overflow-wrap: anywhere;
+    padding: 10px;
+    white-space: pre-wrap;
+}
+
+.qte-card-complete {
+    box-shadow: none;
+}
+
+.qte-intensity-low {
+    border-left-color: #5bbf9d;
+}
+
+.qte-intensity-medium {
+    border-left-color: #c9b458;
+}
+
+.qte-intensity-high {
+    border-left-color: #e08b3e;
+}
+
+.qte-intensity-critical {
+    border-left-color: #d95757;
+}
+
+.qte-intensity-low .qte-progress-fill {
+    background: #5bbf9d;
+}
+
+.qte-intensity-medium .qte-progress-fill {
+    background: #c9b458;
+}
+
+.qte-intensity-high .qte-progress-fill {
+    background: #e08b3e;
+}
+
+.qte-intensity-critical .qte-progress-fill {
+    background: #d95757;
+}
+
+.qte-status-answered .qte-status-badge {
+    color: #5bbf9d;
+}
+
+.qte-status-timeout .qte-status-badge,
+.qte-status-skipped .qte-status-badge,
+.qte-status-error .qte-status-badge {
+    color: #d95757;
+}
+
+@media (max-width: 520px) {
+    .qte-card {
+        padding: 12px;
+    }
+
+    .qte-card-header,
+    .qte-card-controls {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .qte-card-controls .menu_button {
+        width: 100%;
+    }
+}
