@@ -7,7 +7,7 @@ import { ARGUMENT_TYPE, SlashCommandArgument, SlashCommandNamedArgument } from '
 
 const MODULE_NAME = 'quick_time_event';
 const TOOL_NAME = 'start_qte_timer';
-const DEFAULT_FALLBACK = '{{user}} failed to say or do anything';
+const DEFAULT_FALLBACK = '*{{user}} failed to say or do anything*';
 const MIN_SECONDS = 10;
 const MAX_SECONDS = 30;
 const EXTENSION_SCRIPT_URL = document.currentScript?.src ?? '';
