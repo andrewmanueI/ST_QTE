@@ -575,7 +575,11 @@ function renderQteCard({ prompt, seconds, fallbackText, intensity }) {
         });
 
         input.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+            const shouldSubmit = event.key === 'Enter'
+                && !event.shiftKey
+                && (!event.isComposing || event.ctrlKey || event.metaKey);
+
+            if (shouldSubmit) {
                 event.preventDefault();
                 finish('answered', input.value.trim() || fallbackText);
             }
