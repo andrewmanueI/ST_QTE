@@ -19,6 +19,13 @@
     margin: 0;
 }
 
+.qte-tool-status {
+    color: var(--SmartThemeEmColor, inherit);
+    font-size: 0.88rem;
+    line-height: 1.35;
+    opacity: 0.9;
+}
+
 .qte-settings-grid textarea {
     box-sizing: border-box;
     grid-column: 1 / -1;

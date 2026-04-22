@@ -20,6 +20,8 @@ const SETTINGS_TEMPLATE = `
                 <span>Prompt hint</span>
             </label>
 
+            <div id="qte_tool_status" class="qte-tool-status"></div>
+
             <div class="qte-settings-grid">
                 <label for="qte_default_seconds">Default seconds</label>
                 <input id="qte_default_seconds" type="number" min="1" max="30" step="1" />
@@ -43,9 +45,10 @@ const defaultSettings = Object.freeze({
 });
 
 let activeQte = null;
+let toolRegistered = false;
 
 function getContext() {
-    const hostApi = window['Silly' + 'Tavern'];
+    const hostApi = globalThis.SillyTavern ?? window['Silly' + 'Tavern'];
     return hostApi?.getContext?.() ?? {};
 }
 
@@ -151,15 +154,18 @@ function canUseFunctionTools() {
 function registerFunctionTool() {
     const context = getContext();
     const settings = getSettings();
+    toolRegistered = false;
 
     if (typeof context.registerFunctionTool !== 'function' || typeof context.unregisterFunctionTool !== 'function') {
         console.info('Quick Time Event: function tools are not available in this build.');
+        updateToolStatus();
         return;
     }
 
     context.unregisterFunctionTool(TOOL_NAME);
 
     if (!settings.enabled) {
+        updateToolStatus();
         return;
     }
 
@@ -201,6 +207,9 @@ function registerFunctionTool() {
         shouldRegister: () => getSettings().enabled && canUseFunctionTools(),
         stealth: false,
     });
+
+    toolRegistered = true;
+    updateToolStatus();
 }
 
 async function startQteTool(args = {}) {
@@ -423,6 +432,24 @@ async function renderSettings() {
 
     container.insertAdjacentHTML('beforeend', html);
     bindSettings(settings);
+    updateToolStatus();
+}
+
+function updateToolStatus() {
+    const status = document.getElementById('qte_tool_status');
+
+    if (!status) {
+        return;
+    }
+
+    const context = getContext();
+    const hasToolApi = typeof context.registerFunctionTool === 'function'
+        && typeof context.unregisterFunctionTool === 'function';
+    const supported = canUseFunctionTools();
+
+    status.textContent = hasToolApi
+        ? `Tool status: ${toolRegistered ? 'registered' : 'not registered'}; function calling ${supported ? 'enabled' : 'not enabled for this connection'}`
+        : 'Tool status: function tool API unavailable';
 }
 
 function bindSettings(settings) {
@@ -446,12 +473,14 @@ function bindSettings(settings) {
     enabled.addEventListener('change', () => {
         settings.enabled = enabled.checked;
         registerFunctionTool();
+        updateToolStatus();
         saveSettings();
     });
 
     promptHintEnabled.addEventListener('change', () => {
         settings.promptHintEnabled = promptHintEnabled.checked;
         registerFunctionTool();
+        updateToolStatus();
         saveSettings();
     });
 
