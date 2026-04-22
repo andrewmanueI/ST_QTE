@@ -7,6 +7,7 @@ import { ARGUMENT_TYPE, SlashCommandArgument, SlashCommandNamedArgument } from '
 
 const MODULE_NAME = 'quick_time_event';
 const TOOL_NAME = 'start_qte_timer';
+const LEGACY_DEFAULT_FALLBACK = "I couldn't think of anything to say.";
 const DEFAULT_FALLBACK = '*{{user}} failed to say or do anything*';
 const MIN_SECONDS = 10;
 const MAX_SECONDS = 30;
@@ -109,6 +110,10 @@ function normalizeSettings(settings) {
     settings.autoContinueEnabled = Boolean(settings.autoContinueEnabled);
     settings.maxSeconds = clampInteger(settings.maxSeconds, MIN_SECONDS, MAX_SECONDS, defaultSettings.maxSeconds);
     settings.defaultSeconds = clampInteger(settings.defaultSeconds, MIN_SECONDS, settings.maxSeconds, defaultSettings.defaultSeconds);
+
+    if (settings.fallbackText === LEGACY_DEFAULT_FALLBACK) {
+        settings.fallbackText = DEFAULT_FALLBACK;
+    }
 
     if (typeof settings.fallbackText !== 'string' || !settings.fallbackText.trim()) {
         settings.fallbackText = DEFAULT_FALLBACK;
