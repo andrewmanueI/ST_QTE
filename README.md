@@ -30,7 +30,7 @@ Arguments:
 
 - `prompt` required string shown to the user.
 - `seconds` optional integer, default from settings, capped by the max seconds setting.
-- `fallbackText` optional string returned when skipped or timed out.
+- `fallbackText` optional string returned when skipped or timed out. Defaults to `{{user}} failed to say or do anything`.
 - `intensity` optional enum: `low`, `medium`, `high`, or `critical`.
 
 The tool returns:
