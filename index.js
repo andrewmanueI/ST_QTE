@@ -494,17 +494,8 @@ function renderQteCard({ prompt, seconds, fallbackText, intensity }) {
         card.setAttribute('role', 'group');
         card.setAttribute('aria-live', 'polite');
 
-        const header = document.createElement('div');
-        header.className = 'qte-card-header';
-
-        const title = document.createElement('div');
-        title.className = 'qte-card-title';
-        title.textContent = 'Quick Time Event';
-
         const timer = document.createElement('div');
         timer.className = 'qte-card-timer';
-
-        header.append(title, timer);
 
         const promptElement = document.createElement('div');
         promptElement.className = 'qte-card-prompt';
@@ -536,7 +527,7 @@ function renderQteCard({ prompt, seconds, fallbackText, intensity }) {
         skipButton.textContent = 'Skip/Freeze';
 
         controls.append(submitButton, skipButton);
-        card.append(header, promptElement, progressTrack, input, controls);
+        card.append(timer, promptElement, progressTrack, input, controls);
         appendQteCard(card);
 
         const finish = (status, response) => {
@@ -609,19 +600,6 @@ function updateCardSummary(card, { status, prompt, response, elapsedSeconds }) {
     card.classList.add('qte-card-complete', `qte-status-${status}`);
     card.innerHTML = '';
 
-    const header = document.createElement('div');
-    header.className = 'qte-card-header';
-
-    const title = document.createElement('div');
-    title.className = 'qte-card-title';
-    title.textContent = 'QTE Complete';
-
-    const badge = document.createElement('div');
-    badge.className = 'qte-status-badge';
-    badge.textContent = status;
-
-    header.append(title, badge);
-
     const promptElement = document.createElement('div');
     promptElement.className = 'qte-card-prompt';
     promptElement.textContent = prompt;
@@ -630,11 +608,7 @@ function updateCardSummary(card, { status, prompt, response, elapsedSeconds }) {
     responseElement.className = 'qte-card-response';
     responseElement.textContent = response;
 
-    const meta = document.createElement('div');
-    meta.className = 'qte-card-meta';
-    meta.textContent = `Elapsed ${elapsedSeconds.toFixed(1)}s`;
-
-    card.append(header, promptElement, responseElement, meta);
+    card.append(promptElement, responseElement);
 }
 
 async function renderSettings() {
