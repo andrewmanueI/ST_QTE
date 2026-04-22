@@ -204,7 +204,7 @@ function registerFunctionTool() {
         },
         action: startQteTool,
         formatMessage: (args) => args?.prompt ? `Quick Time Event: ${singleLine(args.prompt)}` : 'Quick Time Event',
-        shouldRegister: () => getSettings().enabled && canUseFunctionTools(),
+        shouldRegister: () => getSettings().enabled,
         stealth: false,
     });
 
