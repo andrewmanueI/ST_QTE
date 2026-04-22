@@ -141,34 +141,34 @@ function getToolDescription() {
 }
 
 function canUseFunctionTools() {
-    const context = getContext();
+    const { isToolCallingSupported } = getContext();
 
-    if (typeof context.isToolCallingSupported !== 'function') {
+    if (typeof isToolCallingSupported !== 'function') {
         return false;
     }
 
-    return Boolean(context.isToolCallingSupported());
+    return Boolean(isToolCallingSupported());
 }
 
 function registerFunctionTool() {
-    const context = getContext();
+    const { registerFunctionTool, unregisterFunctionTool } = getContext();
     const settings = getSettings();
     toolRegistered = false;
 
-    if (typeof context.registerFunctionTool !== 'function' || typeof context.unregisterFunctionTool !== 'function') {
+    if (typeof registerFunctionTool !== 'function' || typeof unregisterFunctionTool !== 'function') {
         console.info('Quick Time Event: function tools are not available in this build.');
         updateToolStatus();
         return;
     }
 
-    context.unregisterFunctionTool(TOOL_NAME);
+    unregisterFunctionTool(TOOL_NAME);
 
     if (!settings.enabled) {
         updateToolStatus();
         return;
     }
 
-    context.registerFunctionTool({
+    registerFunctionTool({
         name: TOOL_NAME,
         displayName: 'Quick Time Event',
         description: getToolDescription(),
@@ -493,9 +493,9 @@ function updateToolStatus() {
         return;
     }
 
-    const context = getContext();
-    const hasToolApi = typeof context.registerFunctionTool === 'function'
-        && typeof context.unregisterFunctionTool === 'function';
+    const { registerFunctionTool, unregisterFunctionTool } = getContext();
+    const hasToolApi = typeof registerFunctionTool === 'function'
+        && typeof unregisterFunctionTool === 'function';
     const supported = canUseFunctionTools();
 
     status.textContent = hasToolApi
