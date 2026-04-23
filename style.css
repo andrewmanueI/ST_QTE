@@ -19,6 +19,31 @@
     margin: 0;
 }
 
+.quick-time-event-settings input[type="number"],
+.quick-time-event-settings textarea {
+    background: rgba(12, 14, 18, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 6px;
+    color: #f3f5f7;
+}
+
+.quick-time-event-settings input[type="number"] {
+    min-height: 34px;
+    padding: 6px 10px;
+}
+
+.quick-time-event-settings input[type="number"]::placeholder,
+.quick-time-event-settings textarea::placeholder {
+    color: rgba(243, 245, 247, 0.58);
+}
+
+.quick-time-event-settings input[type="number"]:focus,
+.quick-time-event-settings textarea:focus {
+    border-color: rgba(224, 139, 62, 0.7);
+    box-shadow: 0 0 0 1px rgba(224, 139, 62, 0.28);
+    outline: none;
+}
+
 .qte-tool-status {
     color: var(--SmartThemeEmColor, inherit);
     font-size: 0.88rem;
