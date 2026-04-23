@@ -9,7 +9,7 @@ const MODULE_NAME = 'quick_time_event';
 const TOOL_NAME = 'start_qte_timer';
 const LEGACY_DEFAULT_FALLBACK = "I couldn't think of anything to say.";
 const DEFAULT_FALLBACK = '*{{user}} failed to say or do anything*';
-const MIN_SECONDS = 10;
+const ABS_MIN_SECONDS = 1;
 const MAX_SECONDS = 30;
 const EXTENSION_SCRIPT_URL = document.currentScript?.src ?? '';
 const SETTINGS_TEMPLATE = `
@@ -40,14 +40,22 @@ const SETTINGS_TEMPLATE = `
                 <span>Send QTE result as user and auto-continue</span>
             </label>
 
+            <label class="checkbox_label" for="qte_timer_enabled">
+                <input id="qte_timer_enabled" type="checkbox" />
+                <span>Enable timer</span>
+            </label>
+
             <div id="qte_tool_status" class="qte-tool-status"></div>
 
             <div class="qte-settings-grid">
+                <label for="qte_min_seconds">Minimum seconds</label>
+                <input id="qte_min_seconds" type="number" min="1" max="30" step="1" />
+
                 <label for="qte_default_seconds">Default seconds</label>
-                <input id="qte_default_seconds" type="number" min="10" max="30" step="1" />
+                <input id="qte_default_seconds" type="number" min="1" max="30" step="1" />
 
                 <label for="qte_max_seconds">Max seconds</label>
-                <input id="qte_max_seconds" type="number" min="10" max="30" step="1" />
+                <input id="qte_max_seconds" type="number" min="1" max="30" step="1" />
 
                 <label for="qte_fallback_text">Fallback text</label>
                 <textarea id="qte_fallback_text" rows="3"></textarea>
@@ -61,6 +69,8 @@ const defaultSettings = Object.freeze({
     promptHintEnabled: true,
     markerModeEnabled: true,
     autoContinueEnabled: true,
+    timerEnabled: true,
+    minSeconds: 10,
     defaultSeconds: 10,
     maxSeconds: 30,
     fallbackText: DEFAULT_FALLBACK,
@@ -108,8 +118,10 @@ function normalizeSettings(settings) {
     settings.promptHintEnabled = Boolean(settings.promptHintEnabled);
     settings.markerModeEnabled = Boolean(settings.markerModeEnabled);
     settings.autoContinueEnabled = Boolean(settings.autoContinueEnabled);
-    settings.maxSeconds = clampInteger(settings.maxSeconds, MIN_SECONDS, MAX_SECONDS, defaultSettings.maxSeconds);
-    settings.defaultSeconds = clampInteger(settings.defaultSeconds, MIN_SECONDS, settings.maxSeconds, defaultSettings.defaultSeconds);
+    settings.timerEnabled = Boolean(settings.timerEnabled);
+    settings.maxSeconds = clampInteger(settings.maxSeconds, ABS_MIN_SECONDS, MAX_SECONDS, defaultSettings.maxSeconds);
+    settings.minSeconds = clampInteger(settings.minSeconds, ABS_MIN_SECONDS, settings.maxSeconds, defaultSettings.minSeconds);
+    settings.defaultSeconds = clampInteger(settings.defaultSeconds, settings.minSeconds, settings.maxSeconds, defaultSettings.defaultSeconds);
 
     if (settings.fallbackText === LEGACY_DEFAULT_FALLBACK) {
         settings.fallbackText = DEFAULT_FALLBACK;
@@ -206,7 +218,7 @@ function registerFunctionTool() {
                 },
                 seconds: {
                     type: 'integer',
-                    minimum: MIN_SECONDS,
+                    minimum: settings.minSeconds,
                     maximum: settings.maxSeconds,
                     default: settings.defaultSeconds,
                     description: 'How many seconds the user has to answer. Capped by the extension settings.',
@@ -480,22 +492,27 @@ async function startQteTool(args = {}, options = {}) {
         });
     }
 
-    const maxSeconds = clampInteger(settings.maxSeconds, MIN_SECONDS, MAX_SECONDS, defaultSettings.maxSeconds);
-    const defaultSeconds = clampInteger(settings.defaultSeconds, MIN_SECONDS, maxSeconds, defaultSettings.defaultSeconds);
-    const seconds = clampInteger(args.seconds, MIN_SECONDS, maxSeconds, defaultSeconds);
+    const maxSeconds = clampInteger(settings.maxSeconds, ABS_MIN_SECONDS, MAX_SECONDS, defaultSettings.maxSeconds);
+    const minSeconds = clampInteger(settings.minSeconds, ABS_MIN_SECONDS, maxSeconds, defaultSettings.minSeconds);
+    const defaultSeconds = clampInteger(settings.defaultSeconds, minSeconds, maxSeconds, defaultSettings.defaultSeconds);
+    const seconds = clampInteger(args.seconds, minSeconds, maxSeconds, defaultSeconds);
     const fallbackText = typeof args.fallbackText === 'string' && args.fallbackText.trim()
         ? args.fallbackText.trim()
         : settings.fallbackText;
     const intensity = ['low', 'medium', 'high', 'critical'].includes(args.intensity) ? args.intensity : 'high';
+    const timerEnabled = settings.timerEnabled;
 
-    return await renderQteCard({ prompt, seconds, fallbackText, intensity });
+    return await renderQteCard({ prompt, seconds, fallbackText, intensity, timerEnabled });
 }
 
-function renderQteCard({ prompt, seconds, fallbackText, intensity }) {
+function renderQteCard({ prompt, seconds, fallbackText, intensity, timerEnabled }) {
     return new Promise((resolve) => {
         const startedAt = performance.now();
         const card = document.createElement('div');
         card.className = `qte-card qte-intensity-${intensity}`;
+        if (!timerEnabled) {
+            card.classList.add('qte-card-no-timer');
+        }
         card.setAttribute('role', 'group');
         card.setAttribute('aria-live', 'polite');
 
@@ -532,7 +549,12 @@ function renderQteCard({ prompt, seconds, fallbackText, intensity }) {
         skipButton.textContent = 'Skip/Freeze';
 
         controls.append(submitButton, skipButton);
-        card.append(timer, promptElement, progressTrack, input, controls);
+
+        if (timerEnabled) {
+            card.append(timer, promptElement, progressTrack, input, controls);
+        } else {
+            card.append(promptElement, input, controls);
+        }
         appendQteCard(card);
 
         const finish = (status, response) => {
@@ -540,8 +562,13 @@ function renderQteCard({ prompt, seconds, fallbackText, intensity }) {
                 return;
             }
 
-            clearInterval(activeQte.intervalId);
-            clearTimeout(activeQte.timeoutId);
+            if (activeQte.intervalId) {
+                clearInterval(activeQte.intervalId);
+            }
+
+            if (activeQte.timeoutId) {
+                clearTimeout(activeQte.timeoutId);
+            }
 
             const elapsedSeconds = (performance.now() - startedAt) / 1000;
             const result = formatQteResult({ status, prompt, response, elapsedSeconds });
@@ -583,11 +610,14 @@ function renderQteCard({ prompt, seconds, fallbackText, intensity }) {
 
         activeQte = {
             card,
-            intervalId: window.setInterval(updateCountdown, 100),
-            timeoutId: window.setTimeout(() => finish('timeout', fallbackText), seconds * 1000),
+            intervalId: timerEnabled ? window.setInterval(updateCountdown, 100) : null,
+            timeoutId: timerEnabled ? window.setTimeout(() => finish('timeout', fallbackText), seconds * 1000) : null,
         };
 
-        updateCountdown();
+        if (timerEnabled) {
+            updateCountdown();
+        }
+
         input.focus({ preventScroll: true });
         card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
@@ -661,11 +691,13 @@ function bindSettings(settings) {
     const promptHintEnabled = document.getElementById('qte_prompt_hint_enabled');
     const markerModeEnabled = document.getElementById('qte_marker_mode_enabled');
     const autoContinueEnabled = document.getElementById('qte_auto_continue_enabled');
+    const timerEnabled = document.getElementById('qte_timer_enabled');
+    const minSeconds = document.getElementById('qte_min_seconds');
     const defaultSeconds = document.getElementById('qte_default_seconds');
     const maxSeconds = document.getElementById('qte_max_seconds');
     const fallbackText = document.getElementById('qte_fallback_text');
 
-    if (!enabled || !promptHintEnabled || !markerModeEnabled || !autoContinueEnabled || !defaultSeconds || !maxSeconds || !fallbackText) {
+    if (!enabled || !promptHintEnabled || !markerModeEnabled || !autoContinueEnabled || !timerEnabled || !minSeconds || !defaultSeconds || !maxSeconds || !fallbackText) {
         console.warn('Quick Time Event: settings controls were not found.');
         return;
     }
@@ -674,9 +706,14 @@ function bindSettings(settings) {
     promptHintEnabled.checked = settings.promptHintEnabled;
     markerModeEnabled.checked = settings.markerModeEnabled;
     autoContinueEnabled.checked = settings.autoContinueEnabled;
+    timerEnabled.checked = settings.timerEnabled;
+    minSeconds.value = settings.minSeconds;
     defaultSeconds.value = settings.defaultSeconds;
     maxSeconds.value = settings.maxSeconds;
     fallbackText.value = settings.fallbackText;
+    defaultSeconds.min = String(settings.minSeconds);
+    maxSeconds.min = String(settings.minSeconds);
+    minSeconds.max = String(settings.maxSeconds);
 
     enabled.addEventListener('change', () => {
         settings.enabled = enabled.checked;
@@ -702,17 +739,37 @@ function bindSettings(settings) {
         saveSettings();
     });
 
+    timerEnabled.addEventListener('change', () => {
+        settings.timerEnabled = timerEnabled.checked;
+        saveSettings();
+    });
+
+    minSeconds.addEventListener('input', () => {
+        settings.minSeconds = clampInteger(minSeconds.value, ABS_MIN_SECONDS, settings.maxSeconds, defaultSettings.minSeconds);
+        settings.defaultSeconds = clampInteger(settings.defaultSeconds, settings.minSeconds, settings.maxSeconds, defaultSettings.defaultSeconds);
+        minSeconds.value = settings.minSeconds;
+        defaultSeconds.value = settings.defaultSeconds;
+        defaultSeconds.min = String(settings.minSeconds);
+        maxSeconds.min = String(settings.minSeconds);
+        saveSettings();
+    });
+
     defaultSeconds.addEventListener('input', () => {
-        settings.defaultSeconds = clampInteger(defaultSeconds.value, MIN_SECONDS, settings.maxSeconds, defaultSettings.defaultSeconds);
+        settings.defaultSeconds = clampInteger(defaultSeconds.value, settings.minSeconds, settings.maxSeconds, defaultSettings.defaultSeconds);
         defaultSeconds.value = settings.defaultSeconds;
         saveSettings();
     });
 
     maxSeconds.addEventListener('input', () => {
-        settings.maxSeconds = clampInteger(maxSeconds.value, MIN_SECONDS, MAX_SECONDS, defaultSettings.maxSeconds);
-        settings.defaultSeconds = clampInteger(settings.defaultSeconds, MIN_SECONDS, settings.maxSeconds, defaultSettings.defaultSeconds);
+        settings.maxSeconds = clampInteger(maxSeconds.value, settings.minSeconds, MAX_SECONDS, defaultSettings.maxSeconds);
+        settings.minSeconds = clampInteger(settings.minSeconds, ABS_MIN_SECONDS, settings.maxSeconds, defaultSettings.minSeconds);
+        settings.defaultSeconds = clampInteger(settings.defaultSeconds, settings.minSeconds, settings.maxSeconds, defaultSettings.defaultSeconds);
+        minSeconds.value = settings.minSeconds;
         maxSeconds.value = settings.maxSeconds;
         defaultSeconds.value = settings.defaultSeconds;
+        defaultSeconds.min = String(settings.minSeconds);
+        maxSeconds.min = String(settings.minSeconds);
+        minSeconds.max = String(settings.maxSeconds);
         saveSettings();
     });
 
